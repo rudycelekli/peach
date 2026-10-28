@@ -337,7 +337,29 @@ class SubtitleApiTests(unittest.TestCase):
         from peach.config import PeachSettings
         return route_client(create_app(PeachSettings(
             db_path=self.db, configured=True, token="",
+            follow_state_root=self.root / "state",
             allowed_media_roots=(self.media,))))
+
+    def test_sidecar_selection_survives_reopening_and_preserves_identity_validation(self):
+        """列表给出的字幕身份可保存，兼容身份和无效输入各按既定规则处理。"""
+        url = "/api/player/memory?video=item:1"
+        with self._client() as client:
+            track = next(row for row in client.get("/api/assets/1/subtitles").json()["subtitles"]
+                         if row["playable"])
+            selected = track["id"]
+            self.assertEqual(client.put(url, json={"selected": selected}).status_code, 200)
+        with self._client() as client:
+            self.assertEqual(client.get(url).json()["selected"], selected)
+            for invalid in ("file:missing", "sidecar:local:missing", "sidecar:local:" + "a" * 63,
+                            "sidecar:local:" + "a" * 65, "sidecar:local:" + "g" * 64,
+                            "sidecar:local:../../private", "sidecar:0"):
+                with self.subTest(selected=invalid):
+                    self.assertEqual(client.put(url, json={"selected": invalid}).status_code, 400)
+                    self.assertEqual(client.get(url).json()["selected"], selected)
+            for compatible in (track["legacy_id"], "native:subtitles:zh:1", None, selected):
+                with self.subTest(selected=compatible):
+                    self.assertEqual(client.put(url, json={"selected": compatible}).status_code, 200)
+                    self.assertEqual(client.get(url).json()["selected"], compatible)
 
     def test_the_list_names_every_track_and_why_one_cannot_play(self):
         with self._client() as client:

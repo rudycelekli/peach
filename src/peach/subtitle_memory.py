@@ -12,6 +12,7 @@ from .fsutil import atomic_write_bytes, atomic_write_text
 
 MAX_BYTES = 8 * 1024 * 1024
 VIDEO_KEY = re.compile(r"(?:item:[1-9][0-9]*|follow:[1-9][0-9]*:(?:main|[0-9]+))")
+_SIDECAR_KEY = re.compile(r"sidecar:(?:[1-9][0-9]*|local:[a-f0-9]{64})")
 COLORS = {"white", "yellow", "green", "cyan", "blue", "magenta", "red", "black"}
 CAPTION_VALUES = {
     "font": {"sans", "mono", "serif", "mono-serif", "casual", "cursive", "small-caps"},
@@ -79,7 +80,7 @@ class SubtitleMemory:
         self.root.mkdir(parents=True, exist_ok=True)
         with FileLock(str(self.manifest) + ".lock"):
             value = self.read()
-            if selected is not None and not selected.startswith("native:") and not re.fullmatch(r"sidecar:[1-9][0-9]*", selected) and not (
+            if selected is not None and not selected.startswith("native:") and not _SIDECAR_KEY.fullmatch(selected) and not (
                     track is not None and selected == key) and not any(
                     row["key"] == selected for row in value["tracks"]):
                 raise ValueError("选择的字幕尚未保存")
