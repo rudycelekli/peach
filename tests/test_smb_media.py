@@ -46,6 +46,29 @@ class _Resource:
 
 
 class SmbMediaTests(unittest.TestCase):
+    def test_SMB字幕发现按资源列目录且排除目录和符号链接(self):
+        from peach import subtitles
+        from peach.smb_transport import SmbEntry
+        root = smb_media.SmbResource('fixture', 'R:/Media', 'smb://files.invalid/media', (),
+                                     SmbConnection('files.invalid', 'media'))
+        entries = [SmbEntry(10, 1, 1, False, 'ABC-123.mp4'),
+                   SmbEntry(10, 1, 1, False, 'ABC-123.chs.srt'),
+                   SmbEntry(10, 1, 1, False, 'OTHER-456.srt'),
+                   SmbEntry(10, 1, 1, True, 'ABC-123.eng.srt'),
+                   SmbEntry(10, 1, 1, False, 'ABC-123.jp.srt', True)]
+        with patch.object(smb_media.SmbResource, 'scandir', return_value=entries):
+            found = subtitles.discover_sidecars(root / 'ABC-123.mp4', scan.VIDEO)
+        self.assertEqual([row['name'] for row in found], ['ABC-123.chs.srt'])
+        self.assertEqual(found[0]['path'], str(root / 'ABC-123.chs.srt'))
+        self.assertEqual(found[0]['language'], 'zh-Hans')
+
+    def test_SMB字幕目录读取失败时返回空集合(self):
+        from peach import subtitles
+        root = smb_media.SmbResource('fixture', 'R:/Media', 'smb://files.invalid/media', (),
+                                     SmbConnection('files.invalid', 'media'))
+        with patch.object(smb_media.SmbResource, 'scandir', side_effect=PermissionError('denied')):
+            self.assertEqual(subtitles.discover_sidecars(root / 'ABC-123.mp4', scan.VIDEO), [])
+
     def tearDown(self):
         smb_media.close_bridge()
 

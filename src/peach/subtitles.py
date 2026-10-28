@@ -259,12 +259,17 @@ def file_key(name: str) -> str:
 
 def discover_sidecars(video: Path, video_suffixes: set[str]) -> list[dict]:
     """读取正片所在目录，返回配给当前视频的字幕，不写账本。"""
+    from .smb_media import SmbResource
     try:
-        with os.scandir(video.parent) as entries:
-            names = [entry.name for entry in entries
-                     if (Path(entry.name).suffix.lower() in video_suffixes
-                         or subtitle_format(entry.name))
-                     and entry.is_file(follow_symlinks=False)]
+        if isinstance(video.parent, SmbResource):
+            from .library_nfo import directory_files
+            names = [entry.name for entry in directory_files(video.parent).values()]
+        else:
+            with os.scandir(video.parent) as entries:
+                names = [entry.name for entry in entries
+                         if (Path(entry.name).suffix.lower() in video_suffixes
+                             or subtitle_format(entry.name))
+                         and entry.is_file(follow_symlinks=False)]
     except OSError:
         return []
     videos = [name for name in names if Path(name).suffix.lower() in video_suffixes]
